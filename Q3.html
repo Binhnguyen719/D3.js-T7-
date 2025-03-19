@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biểu đồ Doanh số bán hàng theo Tháng</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #0e947a;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .bar {
+            transition: 0.3s;
+        }
+        .bar:hover {
+            opacity: 0.8;
+        }
+        .label {
+            font-size: 14px;
+            font-weight: bold;
+            fill: white;
+        }
+        .axis text {
+            font-size: 12px;
+        }
+        .axis path, .axis line {
+            stroke: #bbb;
+            shape-rendering: crispEdges;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Doanh số bán hàng theo Tháng</h1>
+    <div id="chart"></div>
+
+    <script>
+        // Đọc dữ liệu từ file CSV
+        d3.csv("data.csv").then(function (data) {
+            // Chuyển đổi dữ liệu và tính tổng doanh số theo tháng
+            let monthSales = {};
+            data.forEach(d => {
+                let date = new Date(d["Thời gian tạo đơn"]);
+                let month = date.getMonth() + 1; // Lấy tháng (từ 0 nên +1)
+                let sales = parseFloat(d["Thành tiền"]) || 0; // Lấy doanh số
+                monthSales[month] = (monthSales[month] || 0) + sales;
+            });
+
+            // Chuyển đổi dữ liệu thành mảng {month, sales}
+            let formattedData = Object.keys(monthSales).map(m => ({
+                month: "Tháng " + m,
+                sales: monthSales[m]
+            }));
+
+            // Kích thước biểu đồ
+            let margin = { top: 50, right: 50, bottom: 50, left: 70 },
+                width = 900 - margin.left - margin.right,
+                height = 500 - margin.top - margin.bottom;
+
+            // Tạo SVG
+            let svg = d3.select("#chart")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Thang đo X (Tháng)
+            let x = d3.scaleBand()
+                .domain(formattedData.map(d => d.month))
+                .range([0, width])
+                .padding(0.15);
+
+            // Thang đo Y (Doanh số)
+            let y = d3.scaleLinear()
+                .domain([0, d3.max(formattedData, d => d.sales) + 10000000]) // +10M để nhãn không bị cắt
+                .range([height, 0]);
+
+            // Màu sắc từng tháng
+            let color = d3.scaleOrdinal()
+                .domain(formattedData.map(d => d.month))
+                .range(d3.schemeTableau10);
+
+            // Vẽ cột
+            svg.selectAll(".bar")
+                .data(formattedData)
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", d => x(d.month))
+                .attr("y", d => y(d.sales))
+                .attr("width", x.bandwidth())
+                .attr("height", d => height - y(d.sales))
+                .attr("fill", d => color(d.month));
+
+            // Thêm giá trị bên trong cột
+            svg.selectAll(".label")
+                .data(formattedData)
+                .enter().append("text")
+                .attr("class", "label")
+                .attr("x", d => x(d.month) + x.bandwidth() / 2)
+                .attr("y", d => y(d.sales) + 20)  // Dịch xuống để nằm trong cột
+                .attr("text-anchor", "middle")
+                .attr("fill", "white") // Màu chữ trắng
+                .attr("font-weight", "bold")
+                .text(d => `${Math.round(d.sales / 1e6)} triệu VND`)
+                .style("font-size", "8px");
+
+            // Vẽ trục X
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x));
+
+            // Vẽ trục Y
+            svg.append("g")
+                .call(d3.axisLeft(y).ticks(8).tickFormat(d => d / 1e6 + "M"));
+        });
+    </script>
+
+</body>
+</html>
